@@ -2,264 +2,136 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Parfum Wordle</title>
+    <title>Aim Trainer</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
-            background-color: #121212; 
-            color: white; 
             text-align: center; 
-            margin: 0;
-            padding: 20px;
-        }
-        .input-container {
-            position: relative;
-            display: inline-block;
-        }
-        input { 
-            padding: 10px; 
-            font-size: 16px; 
-            border-radius: 5px; 
-            border: none; 
-            width: 220px;
-            box-sizing: border-box;
-        }
-        button { 
-            padding: 10px 20px; 
-            font-size: 16px; 
-            cursor: pointer; 
-            background-color: #4CAF50; 
+            background-color: #222; 
             color: white; 
-            border: none; 
-            border-radius: 5px; 
-            margin-left: 5px;
+            margin-top: 50px;
         }
-        .dropdown {
-            position: absolute;
-            background-color: #222;
-            border: 1px solid #444;
-            border-radius: 5px;
-            width: 100%;
-            max-height: 180px;
-            overflow-y: auto;
-            z-index: 10;
-            display: none;
-            text-align: left;
-            box-sizing: border-box;
-        }
-        .dropdown div {
-            padding: 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #333;
-        }
-        .dropdown div:hover {
-            background-color: #333;
-        }
-        .grid { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            margin-top: 25px; 
-            gap: 15px; 
-        }
-        .guess-block {
-            background-color: #1e1e1e;
-            padding: 12px;
+        #gameArea { 
+            width: 800px; 
+            height: 500px; 
+            background-color: #333; 
+            margin: 20px auto; 
+            position: relative; 
+            border: 3px solid #555;
             border-radius: 10px;
-            width: 100%;
-            max-width: 360px;
-            box-sizing: border-box;
+            overflow: hidden;
+            cursor: crosshair;
         }
-        .guess-title {
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 8px;
-            text-align: left;
-            color: #aaa;
+        .target { 
+            background-color: red; 
+            border-radius: 50%; 
+            position: absolute; 
         }
-        .row { 
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
         }
-        .box { 
-            height: 70px; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            border-radius: 6px; 
-            font-size: 12px; 
-            padding: 4px; 
-            text-align: center; 
-            box-sizing: border-box;
-        }
-        .green { background-color: #538d4e; }
-        .red { background-color: #ba2f2f; }
-        .grey { background-color: #5a5a5c; }
-        .title { 
-            font-weight: bold; 
-            font-size: 9px; 
-            margin-bottom: 4px; 
-            text-transform: uppercase;
-            color: #dcdcdc; 
-        }
-        #loadingMsg {
-            color: #aaa;
-            font-size: 14px;
-            margin-bottom: 15px;
+        .stats {
+            font-size: 20px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
 
-    <h1>Parfum Wordle</h1>
-    <p>Errate das gesuchte Parfum in 5 Versuchen.</p>
-    
-    <div id="loadingMsg">Lade Parfums aus der Datenbank...</div>
-
-    <div class="input-container">
-        <input type="text" id="guessInput" placeholder="Parfum eingeben..." oninput="showSuggestions()" autocomplete="off" disabled>
-        <div id="dropdownList" class="dropdown"></div>
+    <h1>Aim Trainer</h1>
+    <div class="stats">
+        Punkte: <span id="score">0</span> | Zeit: <span id="time">30</span>s
     </div>
-    <button id="guessBtn" onclick="makeGuess()" disabled>Raten</button>
-
-    <div class="grid" id="gameGrid"></div>
+    <button id="startBtn" onclick="startGame()">Spiel starten</button>
+    
+    <div id="gameArea"></div>
 
     <script>
-        let database = [];
-        let target = null;
-        let guesses = 0;
-        const maxGuesses = 5;
+        let score = 0;
+        let time = 30;
+        let timer;
+        let totalClicks = 0;
+        let targetSize = 50;
+        
+        const gameArea = document.getElementById("gameArea");
+        const scoreDisplay = document.getElementById("score");
+        const timeDisplay = document.getElementById("time");
+        const startBtn = document.getElementById("startBtn");
 
-        async function initGame() {
-            try {
-                const response = await fetch('https://perfumapi-frontend.onrender.com/perfumes?limit=100');
-                const data = await response.json();
-                
-                database = data.perfumes.map(p => {
-                    return {
-                        name: p.name,
-                        brand: p.brand,
-                        gender: p.gender || "Unbekannt",
-                        year: p.release_year || 0,
-                        sillage: p.sillage || "Unbekannt",
-                        longevity: p.longevity || "Unbekannt",
-                        topNote: (p.notes_top && p.notes_top.length > 0) ? p.notes_top[0] : "Keine"
-                    };
-                });
-
-                database.sort((a, b) => (a.brand + " " + a.name).localeCompare(b.brand + " " + b.name));
-
-                target = database[Math.floor(Math.random() * database.length)];
-                
-                document.getElementById("loadingMsg").style.display = "none";
-                document.getElementById("guessInput").disabled = false;
-                document.getElementById("guessBtn").disabled = false;
-            } catch (error) {
-                document.getElementById("loadingMsg").innerText = "Fehler beim Laden der API Daten.";
-                console.error(error);
-            }
-        }
-
-        initGame();
-
-        function showSuggestions() {
-            const input = document.getElementById("guessInput");
-            const filter = input.value.toLowerCase();
-            const dropdown = document.getElementById("dropdownList");
-            
-            if (!filter) {
-                dropdown.style.display = "none";
-                return;
+        gameArea.onmousedown = function(e) {
+            if (time > 0 && time <= 30 && startBtn.disabled) { 
+                totalClicks++;
             }
             
-            dropdown.innerHTML = "";
-            let hasMatches = false;
-            
-            database.forEach(p => {
-                const fullName = p.brand + " " + p.name;
-                if (fullName.toLowerCase().includes(filter)) {
-                    const div = document.createElement("div");
-                    div.textContent = fullName;
-                    div.onclick = function() {
-                        input.value = p.name;
-                        dropdown.style.display = "none";
-                    };
-                    dropdown.appendChild(div);
-                    hasMatches = true;
+            if (e.target.classList.contains("target")) {
+                score++;
+                scoreDisplay.innerText = score;
+                
+                if (targetSize > 10) {
+                    targetSize -= 1.5; 
                 }
-            });
+                
+                spawnTarget();
+            }
+        };
+
+        function startGame() {
+            score = 0;
+            time = 30;
+            totalClicks = 0;
+            targetSize = 50;
             
-            dropdown.style.display = hasMatches ? "block" : "none";
+            scoreDisplay.innerText = score;
+            timeDisplay.innerText = time;
+            gameArea.innerHTML = "";
+            startBtn.disabled = true;
+            
+            clearInterval(timer);
+            timer = setInterval(updateTime, 1000);
+            
+            spawnTarget();
         }
 
-        document.addEventListener("click", function(e) {
-            if (e.target.id !== "guessInput") {
-                document.getElementById("dropdownList").style.display = "none";
-            }
-        });
-
-        function makeGuess() {
-            if (guesses >= maxGuesses) {
-                alert("Keine Versuche mehr übrig! Das Parfum war: " + target.brand + " " + target.name);
-                return;
-            }
-
-            const inputVal = document.getElementById("guessInput").value.trim();
-            const guess = database.find(p => p.name.toLowerCase() === inputVal.toLowerCase());
-
-            if (!guess) {
-                alert("Bitte wähle ein Parfum aus der Liste aus.");
-                return;
-            }
-
-            const grid = document.getElementById("gameGrid");
-            const block = document.createElement("div");
-            block.className = "guess-block";
+        function updateTime() {
+            time--;
+            timeDisplay.innerText = time;
             
-            const title = document.createElement("div");
-            title.className = "guess-title";
-            title.textContent = (guesses + 1) + ". " + guess.brand + " " + guess.name;
-            block.appendChild(title);
-
-            const row = document.createElement("div");
-            row.className = "row";
-
-            row.appendChild(createBox("Marke", guess.brand, guess.brand === target.brand ? "green" : "grey"));
-            row.appendChild(createBox("Haltbarkeit", guess.longevity, guess.longevity === target.longevity ? "green" : "red"));
-            row.appendChild(createBox("Kopfnote", guess.topNote, guess.topNote === target.topNote ? "green" : "red"));
-            row.appendChild(createBox("Sillage", guess.sillage, guess.sillage === target.sillage ? "green" : "red"));
-            row.appendChild(createBox("Typ", guess.gender, guess.gender === target.gender ? "green" : "red"));
-
-            let yearText = guess.year;
-            let yearColor = "grey";
-            if (guess.year === target.year) {
-                yearColor = "green";
-            } else if (target.year > guess.year) {
-                yearText += " ⬆️";
-            } else {
-                yearText += " ⬇️";
-            }
-            row.appendChild(createBox("Jahr", yearText, yearColor));
-
-            block.appendChild(row);
-            grid.insertBefore(block, grid.firstChild); 
-            
-            guesses++;
-            document.getElementById("guessInput").value = "";
-
-            if (guess.name === target.name) {
-                setTimeout(() => alert("Stark! Du hast das Parfum erraten!"), 100);
+            if (time <= 0) {
+                clearInterval(timer);
+                gameArea.innerHTML = "";
+                startBtn.disabled = false;
+                
+                let accuracy = 0;
+                if (totalClicks > 0) {
+                    accuracy = Math.round((score / totalClicks) * 100);
+                }
+                alert("Zeit abgelaufen! Punkte: " + score + " | Trefferquote: " + accuracy + "%");
             }
         }
 
-        function createBox(title, value, colorClass) {
-            const box = document.createElement("div");
-            box.className = "box " + colorClass;
-            box.innerHTML = "<div class='title'>" + title + "</div><div>" + value + "</div>";
-            return box;
+        function spawnTarget() {
+            gameArea.innerHTML = "";
+            const target = document.createElement("div");
+            target.className = "target";
+            
+            target.style.width = targetSize + "px";
+            target.style.height = targetSize + "px";
+            
+            const maxX = gameArea.clientWidth - targetSize;
+            const maxY = gameArea.clientHeight - targetSize;
+            const randomX = Math.floor(Math.random() * maxX);
+            const randomY = Math.floor(Math.random() * maxY);
+            
+            target.style.left = randomX + "px";
+            target.style.top = randomY + "px";
+            
+            gameArea.appendChild(target);
         }
     </script>
 
