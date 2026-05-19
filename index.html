@@ -2,6 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Parfum Wordle</title>
     <style>
         body { 
@@ -9,14 +10,20 @@
             background-color: #121212; 
             color: white; 
             text-align: center; 
-            margin-top: 20px;
+            margin: 0;
+            padding: 20px;
+        }
+        .input-container {
+            position: relative;
+            display: inline-block;
         }
         input { 
             padding: 10px; 
             font-size: 16px; 
             border-radius: 5px; 
             border: none; 
-            width: 200px;
+            width: 220px;
+            box-sizing: border-box;
         }
         button { 
             padding: 10px 20px; 
@@ -26,29 +33,65 @@
             color: white; 
             border: none; 
             border-radius: 5px; 
-            margin-left: 10px;
+            margin-left: 5px;
+        }
+        .dropdown {
+            position: absolute;
+            background-color: #222;
+            border: 1px solid #444;
+            border-radius: 5px;
+            width: 100%;
+            max-height: 180px;
+            overflow-y: auto;
+            z-index: 10;
+            display: none;
+            text-align: left;
+            box-sizing: border-box;
+        }
+        .dropdown div {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+        }
+        .dropdown div:hover {
+            background-color: #333;
         }
         .grid { 
             display: flex; 
             flex-direction: column; 
             align-items: center; 
-            margin-top: 30px; 
-            gap: 10px; 
+            margin-top: 25px; 
+            gap: 15px; 
+        }
+        .guess-block {
+            background-color: #1e1e1e;
+            padding: 12px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 360px;
+            box-sizing: border-box;
+        }
+        .guess-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-align: left;
+            color: #aaa;
         }
         .row { 
-            display: flex; 
-            gap: 10px; 
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
         }
         .box { 
-            width: 130px; 
-            height: 90px; 
+            height: 70px; 
             display: flex; 
             flex-direction: column; 
             justify-content: center; 
             align-items: center; 
-            border-radius: 8px; 
-            font-size: 14px; 
-            padding: 5px; 
+            border-radius: 6px; 
+            font-size: 12px; 
+            padding: 4px; 
             text-align: center; 
             box-sizing: border-box;
         }
@@ -57,8 +100,8 @@
         .grey { background-color: #5a5a5c; }
         .title { 
             font-weight: bold; 
-            font-size: 11px; 
-            margin-bottom: 8px; 
+            font-size: 9px; 
+            margin-bottom: 4px; 
             text-transform: uppercase;
             color: #dcdcdc; 
         }
@@ -67,30 +110,74 @@
 <body>
 
     <h1>Parfum Wordle</h1>
-    <p>Du hast 5 Versuche, um das richtige Parfum zu finden.</p>
-    <p>Tippe zum Testen einfach mal <b>Imagination</b> ein!</p>
+    <p>Errate das gesuchte Parfum in 5 Versuchen.</p>
 
-    <div>
-        <input type="text" id="guessInput" placeholder="Parfum Name eingeben...">
-        <button onclick="makeGuess()">Raten</button>
+    <div class="input-container">
+        <input type="text" id="guessInput" placeholder="Parfum eingeben..." oninput="showSuggestions()" autocomplete="off">
+        <div id="dropdownList" class="dropdown"></div>
     </div>
+    <button onclick="makeGuess()">Raten</button>
 
     <div class="grid" id="gameGrid"></div>
 
     <script>
         const database = [
-            { name: "Naxos", brand: "Xerjoff", niche: "Ja", season: "Winter/Herbst", sillage: 8.5, price: 250, accord: "Süß, Tabak" },
-            { name: "Imagination", brand: "Louis Vuitton", niche: "Nein", season: "Frühling/Sommer", sillage: 7.6, price: 300, accord: "Frisch, Zitrus" },
-            { name: "Aventus", brand: "Creed", niche: "Ja", season: "Frühling/Sommer", sillage: 7.0, price: 295, accord: "Fruchtig, Rauchig" }
+            { name: "Naxos", brand: "Xerjoff", niche: "Ja", season: "Winter/Herbst", sillage: 8.5, gender: "Unisex", year: 2015 },
+            { name: "Alexandria II", brand: "Xerjoff", niche: "Ja", season: "Winter", sillage: 9.0, gender: "Unisex", year: 2012 },
+            { name: "Erba Pura", brand: "Xerjoff", niche: "Ja", season: "Frühling/Sommer", sillage: 8.8, gender: "Unisex", year: 2019 },
+            { name: "Torino21", brand: "Xerjoff", niche: "Ja", season: "Sommer", sillage: 7.8, gender: "Unisex", year: 2021 },
+            { name: "Imagination", brand: "Louis Vuitton", niche: "Nein", season: "Frühling/Sommer", sillage: 7.6, gender: "Men", year: 2021 },
+            { name: "Aventus", brand: "Creed", niche: "Ja", season: "Frühling/Sommer", sillage: 7.0, gender: "Men", year: 2010 },
+            { name: "Goddess", brand: "Burberry", niche: "Nein", season: "Herbst/Winter", sillage: 6.8, gender: "Women", year: 2023 }
         ];
 
-        const target = database[0]; 
+        // Alphabetisch nach Marke sortieren
+        database.sort((a, b) => (a.brand + " " + a.name).localeCompare(b.brand + " " + b.name));
+
+        const target = database[0]; // Das gesuchte Parfum ist Xerjoff Naxos
         let guesses = 0;
         const maxGuesses = 5;
 
+        function showSuggestions() {
+            const input = document.getElementById("guessInput");
+            const filter = input.value.toLowerCase();
+            const dropdown = document.getElementById("dropdownList");
+            
+            if (!filter) {
+                dropdown.style.display = "none";
+                return;
+            }
+            
+            dropdown.innerHTML = "";
+            let hasMatches = false;
+            
+            database.forEach(p => {
+                const fullName = p.brand + " - " + p.name;
+                if (fullName.toLowerCase().includes(filter)) {
+                    const div = document.createElement("div");
+                    div.textContent = fullName;
+                    div.onclick = function() {
+                        input.value = p.name;
+                        dropdown.style.display = "none";
+                    };
+                    dropdown.appendChild(div);
+                    hasMatches = true;
+                }
+            });
+            
+            dropdown.style.display = hasMatches ? "block" : "none";
+        }
+
+        // Dropdown schließen wenn man außerhalb klickt
+        document.addEventListener("click", function(e) {
+            if (e.target.id !== "guessInput") {
+                document.getElementById("dropdownList").style.style.display = "none";
+            }
+        });
+
         function makeGuess() {
             if (guesses >= maxGuesses) {
-                alert("Keine Versuche mehr übrig! Das Parfum war: " + target.name);
+                alert("Keine Versuche mehr übrig! Das Parfum war: " + target.brand + " - " + target.name);
                 return;
             }
 
@@ -98,19 +185,33 @@
             const guess = database.find(p => p.name.toLowerCase() === inputVal.toLowerCase());
 
             if (!guess) {
-                alert("Dieses Parfum kenne ich noch nicht. Probier mal Imagination oder Naxos.");
+                alert("Bitte wähle ein Parfum aus der Dropdown-Liste aus.");
                 return;
             }
 
             const grid = document.getElementById("gameGrid");
+            
+            const block = document.createElement("div");
+            block.className = "guess-block";
+            
+            const title = document.createElement("div");
+            title.className = "guess-title";
+            title.textContent = (guesses + 1) + ". " + guess.brand + " - " + guess.name;
+            block.appendChild(title);
+
             const row = document.createElement("div");
             row.className = "row";
 
-            row.appendChild(createBox("Name", guess.name, guess.name === target.name ? "green" : "grey"));
+            // 1. Marke
             row.appendChild(createBox("Marke", guess.brand, guess.brand === target.brand ? "green" : "grey"));
+            
+            // 2. Nischenduft
             row.appendChild(createBox("Nische", guess.niche, guess.niche === target.niche ? "green" : "red"));
+            
+            // 3. Jahreszeit
             row.appendChild(createBox("Jahreszeit", guess.season, guess.season === target.season ? "green" : "red"));
             
+            // 4. Sillage
             let sillageText = guess.sillage;
             let sillageColor = "grey";
             if (guess.sillage === target.sillage) {
@@ -122,25 +223,29 @@
             }
             row.appendChild(createBox("Sillage", sillageText, sillageColor));
 
-            let priceText = guess.price + " €";
-            let priceColor = "grey";
-            if (guess.price === target.price) {
-                priceColor = "green";
-            } else if (target.price < guess.price) {
-                priceText += " ⬇️";
+            // 5. Geschlecht
+            row.appendChild(createBox("Typ", guess.gender, guess.gender === target.gender ? "green" : "red"));
+
+            // 6. Erscheinungsjahr
+            let yearText = guess.year;
+            let yearColor = "grey";
+            if (guess.year === target.year) {
+                yearColor = "green";
+            } else if (target.year > guess.year) {
+                yearText += " ⬆️";
             } else {
-                priceText += " ⬆️";
+                yearText += " ⬇️";
             }
-            row.appendChild(createBox("Preis", priceText, priceColor));
+            row.appendChild(createBox("Jahr", yearText, yearColor));
 
-            row.appendChild(createBox("Akkord", guess.accord, guess.accord === target.accord ? "green" : "red"));
-
-            grid.appendChild(row);
+            block.appendChild(row);
+            grid.insertBefore(block, grid.firstChild); // Neuer Versuch immer oben anzeigen
+            
             guesses++;
             document.getElementById("guessInput").value = "";
 
             if (guess.name === target.name) {
-                setTimeout(() => alert("Perfekt! Du hast das Parfum erraten!"), 100);
+                setTimeout(() => alert("Stark! Du hast das Parfum erraten!"), 100);
             }
         }
 
